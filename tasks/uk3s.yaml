@@ -1,0 +1,49 @@
+---
+- name: Check if kubectl is installed
+  ansible.builtin.command: which kubectl
+  register: kubectl_check
+  changed_when: false
+  failed_when: false   # ← prevents "FAILED" red line
+
+- name: Undeploy all resources in default namespace
+  ansible.builtin.shell: |
+    kubectl delete all --all --namespace default --ignore-not-found=true || true
+    kubectl delete pvc --all --namespace default --ignore-not-found=true || true
+    kubectl delete pv --all --ignore-not-found=true || true
+  when: kubectl_check.rc == 0   # only run if kubectl found
+  ignore_errors: true
+  changed_when: false
+
+# - name: Delete kube directory (uncomment if you want to remove /home/q/kube/)
+#   ansible.builtin.file:
+#     path: /home/q/kube/
+#     state: absent
+  # ignore_errors: true   # uncomment if needed
+
+- name: Start dnsmasq service
+  ansible.builtin.systemd:
+    name: dnsmasq
+    enabled: yes
+    state: started
+    masked: no
+
+- name: Stop k3s service
+  ansible.builtin.systemd:
+    name: k3s
+    state: stopped
+    enabled: no
+    masked: yes
+  ignore_errors: true
+
+- name: Uninstall k3s completely
+  ansible.builtin.shell: |
+    /usr/local/bin/k3s-uninstall.sh || true
+  ignore_errors: true
+  changed_when: false
+
+- name: Unconditionally reboot the machine
+  ansible.builtin.reboot:
+    msg: "Rebooting after k3s uninstall"
+    pre_reboot_delay: 5
+    reboot_timeout: 600
+    test_command: whoami

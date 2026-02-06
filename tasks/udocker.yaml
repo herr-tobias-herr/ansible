@@ -1,0 +1,115 @@
+---
+- name: Remove old conflicting Docker GPG key
+  ansible.builtin.file:
+    path: /usr/share/keyrings/docker-ce-archive-keyring.gpg
+    state: absent
+  changed_when: false
+
+- name: Remove old Docker repo files (if exist)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/apt/sources.list.d/docker.list
+    - /etc/apt/sources.list.d/docker.sources
+  ignore_errors: true
+  changed_when: false
+
+- name: Update apt cache after cleanup
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Stop and disable Docker service if it exists
+  ansible.builtin.systemd:
+    name: docker
+    state: stopped
+    enabled: false
+  when:
+    - ansible_facts.service_mgr == 'systemd'
+    - ansible_facts.services is defined
+    - "'docker.service' in ansible_facts.services"
+
+- name: Stop and disable containerd service if it exists
+  ansible.builtin.systemd:
+    name: containerd
+    state: stopped
+    enabled: false
+  when:
+    - ansible_facts.service_mgr == 'systemd'
+    - ansible_facts.services is defined
+    - "'containerd.service' in ansible_facts.services"
+
+- name: Uninstall main Docker packages
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+      - docker-ce-rootless-extras
+    state: absent
+    purge: true
+    autoremove: true
+
+- name: Uninstall legacy / conflicting Docker packages
+  ansible.builtin.apt:
+    name:
+      - docker
+      - docker-engine
+      - docker.io
+      - docker-compose
+      - docker-doc
+      - podman-docker
+      - runc
+    state: absent
+    purge: true
+    autoremove: true
+
+- name: Remove Docker APT repository file (old style)
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/docker.list
+    state: absent
+
+- name: Remove Docker sources file (newer Debian-style)
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/docker.sources
+    state: absent
+
+- name: Remove Docker GPG keys
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /usr/share/keyrings/docker-archive-keyring.gpg
+    - /etc/apt/keyrings/docker.asc
+
+- name: Remove docker group
+  ansible.builtin.group:
+    name: docker
+    state: absent
+  ignore_errors: true
+
+- name: Remove Docker data directories (WARNING – irreversible!)
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+    force: true
+  loop:
+    - /var/lib/docker
+    - /var/lib/containerd
+    - /etc/docker
+    - /var/run/docker.sock
+  when: remove_docker_data | default(false) | bool
+
+- name: Update apt cache after removal
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Display final warning if data was removed
+  ansible.builtin.debug:
+    msg: "Docker has been fully removed. Data directories (/var/lib/docker, etc.) were deleted because remove_docker_data was set to true."
+  when: remove_docker_data | default(false) | bool

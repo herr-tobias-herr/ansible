@@ -1,0 +1,54 @@
+---
+- name: Run Node Tasks
+  hosts: all  # or 'cluster' or whatever group you want as the default
+  become: true
+  tasks:
+    # - name: Update
+    #   ansible.builtin.import_tasks: ./../tasks/apt_update.yaml
+
+    # - name: uninstall docker
+    #   ansible.builtin.import_tasks: ./../tasks/udocker.yaml
+    # - name: uninstall k3s
+    #   ansible.builtin.import_tasks: ./../tasks/uk3s.yaml
+
+    # - name: install docker
+    #   ansible.builtin.import_tasks: ./../tasks/docker.yaml
+    # - name: install k3s
+    #   ansible.builtin.import_tasks: ./../tasks/k3s.yaml
+    - name: setup kube
+      ansible.builtin.import_tasks: ./../tasks/kube.yaml
+
+  handlers:
+      - name: Restart containerd
+        ansible.builtin.systemd:
+          name: containerd
+          state: restarted
+
+
+
+# - name: Include a play after another play
+# ansible.builtin.import_playbook: init.yml
+# - name: basic install
+#   ansible.builtin.import_playbook: install.yml
+# - name: write ip tables
+#   ansible.builtin.import_playbook: nat.yml
+
+
+# - name: Setup Crontab
+#   ansible.builtin.import_playbook: crontab.yml
+# - name: install RetroPie
+#   ansible.builtin.import_playbook: RetroPie.yml
+# - name: uninstall k3s
+#   ansible.builtin.import_playbook: UninstallK3s.yml
+
+
+# - name: reset Nextcloud
+#   ansible.builtin.import_playbook: Resetnextcloud.yaml
+
+# - name: install kubernetes
+#   ansible.builtin.import_playbook: kubernetes.ym
+# - name: install minikube. Does not work for host network!
+#   ansible.builtin.import_playbook: minikube.yml
+
+# - name: install RetroPie
+#   ansible.builtin.import_playbook: RetroPie.yml

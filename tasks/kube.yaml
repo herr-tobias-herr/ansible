@@ -1,0 +1,98 @@
+- name: Ensure required directories exist
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode | default('0755') }}"
+  loop:
+    - path: /home/q/kube/deployment
+      owner: q
+      group: q
+
+    - path: /home/q/kube/jellyfin
+      owner: q
+      group: q
+
+    - path: /home/q/kube/nextcloud/db
+      owner: www-data
+      group: www-data
+
+    - path: /home/q/kube/nextcloud/config
+      owner: www-data
+      group: www-data
+
+    - path: /home/q/kube/nextcloud/data
+      owner: www-data
+      group: www-data
+      mode: '0770'
+
+    - path: /home/q/kube/pihole
+      owner: root
+      group: root
+
+    - path: /home/q/kube/pihole/pihole
+      owner: root
+      group: root
+
+    - path: /home/q/kube/pihole/dnsmasq.d
+      owner: root
+      group: root
+
+- name: Copy Nextcloud deployment file
+  copy:
+    src: "{{ playbook_dir }}/../../kube/deployment/nextcloud.yaml"
+    dest: /home/q/kube/deployment/nextcloud.yaml
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+
+- name: Copy Pi-hole deployment file
+  copy:
+    src: "{{ playbook_dir }}/../../kube/deployment/pihole.yaml"
+    dest: /home/q/kube/deployment/pihole.yaml
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  
+- name: Copy jellyfin deployment file
+  copy:
+    src: "{{ playbook_dir }}/../../kube/deployment/jellyfin.yaml"
+    dest: /home/q/kube/deployment/jellyfin.yaml
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+
+# - name: Stop and mask dnsmasq service
+#   systemd:
+#     name: dnsmasq
+#     state: stopped
+#     enabled: no
+#     masked: yes
+
+- name: Deploy Pi-hole using kubectl (Port 53 caution)
+  ansible.builtin.shell: kubectl apply -f /home/q/kube/deployment/pihole.yaml
+
+- name: Deploy Nextcloud using kubectl
+  ansible.builtin.shell: kubectl apply -f /home/q/kube/deployment/nextcloud.yaml
+
+- name: Deploy Jellyfin using kubectl
+  ansible.builtin.shell: kubectl apply -f /home/q/kube/deployment/jellyfin.yaml
+
+- name: Copy Pi-hole setupVars.conf
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../kube/deployment/pihole/pihole/setupVars.conf"
+    dest: /home/q/kube/pihole/pihole/setupVars.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Copy Pi-hole dnsmasq.d recursively (modern)
+  ansible.posix.synchronize:
+    src: "{{ playbook_dir }}/../../kube/deployment/pihole/dnsmasq.d/"
+    dest: /home/q/kube/pihole/dnsmasq.d/
+    recursive: yes
+    owner: yes
+    group: yes
+    perms: yes
+
